@@ -1,46 +1,69 @@
-
-resource "github_repository" "my_repo" {
-  name = "github-terraform-task-VladyslavDmytruk"
+provider "github" {
+  token = "ghp_hdwa6UjIHHFEIml8eHrxzn3lCocdL208k12fdff" 
+# Replace with your GitHub Personal Access Token
 }
 
-# Add collaborator
+resource "github_repository" "repo" {
+  name        = "github-terraform-task-VladyslavDmytruk"
+  description = "Repository configured with Terraform"
+  visibility  = "private"
+  has_issues  = true
+  has_projects = true
+  has_wiki    = true
+}
+
+resource "github_branch" "develop" {
+  repository = github_repository.repo.name
+  branch     = "develop"
+}
+
+resource "github_branch_default" "default" {
+  repository = github_repository.repo.name
+  branch     = github_branch.develop.branch
+}
+
+resource "github_branch_protection_v3" "develop " {
+  repository_id = github_repository.repo.name
+  pattern       = "develop "
+
+  required_pull_request_reviews {
+    dismiss_stale_reviews           = true
+    require_code_owner_reviews      = true
+    required_approving_review_count = 1
+  }
+  enforce_admins = false
+  restrictions {
+    users = []
+    teams = []
+  }
+
+}
+
+resource "github_branch_protection_v3" "develop" {
+  repository_id = github_repository.repo.name
+  pattern       = "develop"
+
+  required_pull_request_reviews {
+    dismiss_stale_reviews           = true
+    required_approving_review_count = 2
+  }
+  enforce_admins = false
+  restrictions {
+    users = []
+    teams = []
+  }
+}
+
 resource "github_repository_collaborator" "collaborator" {
-  repository = github_repository.my_repo.name
+  repository = github_repository.repo.name
   username   = "softservedata"
   permission = "push"
 }
 
-# Protect the main branch
-resource "github_branch_protection" "main" {
-  repository = github_repository.my_repo.name
-  branch     = "main"
-
-  required_pull_request_reviews {
-    dismiss_stale_reviews          = true
-    required_approving_review_count = 1
-  }
-
-  enforce_admins = true
-}
-
-# Protect the develop branch
-resource "github_branch_protection" "develop" {
-  repository = github_repository.my_repo.name
-  branch     = "develop"
-
-  required_pull_request_reviews {
-    dismiss_stale_reviews          = true
-    required_approving_review_count = 2
-  }
-
-  enforce_admins = true
-}
-
-# Add pull request template
 resource "github_repository_file" "pull_request_template" {
-  repository = github_repository.my_repo.name
+  repository = github_repository.repo.name
   file       = ".github/pull_request_template.md"
-  content    = <<EOF
+  content    = <<EOT
 Describe your changes
 Issue ticket number and link
 Checklist before requesting a review:
@@ -48,60 +71,28 @@ Checklist before requesting a review:
 - [ ] If it is a core feature, I have added thorough tests
 - [ ] Do we need to implement analytics?
 - [ ] Will this be part of a product update? If yes, please write one phrase about this update
-EOF
-
-  commit_message = "Added pull request template"
+EOT
 }
 
-# Add Deploy Key
-resource "github_deploy_key" "deploy_key" {
-  repository = github_repository.my_repo.name
-  title      = "DEPLOY_KEY"
-  key        = var.deploy_key
-  read_only  = false
+resource "github_repository_deploy_key" "deploy_key" {
+  repository    = github_repository.repo.name
+  title         = "DEPLOY_KEY"
+ key           = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDNZ6iV1LiJsVc2miHnD/nPq1gPFTB9obNtOjQ1sMsUeIJV/ub4eujEDh2rRN80qOglUvmqCI6MCs7/5wgh8RmYHpdhIjTNHyFbW4WKgPi2hQBP4z2CM8TRnnESvR9QZtzBQuOxzEXshbvUY90IspFNo8XtRPRPAIQrJZZq/sxltGjVXJHrhyoYOUeHeiXdtMXNFZ09sH30XENNDmTTxMeHxLYhNUGwTEOVm8zQkfuLqPZLz2MVIo8uqkV0yTnr0tc6moQUJoUrk9/oUC7/Kuqe/ATE6fMKDnEX1C2oom5t5VRB97t64Pc75WnFFUd603WZ3TUIeT5+N5QffORflGorA7jpQDq9sfkI37DWhfqRyPwZ3BCGe8+0rZmDXY1WjlG7dLKcAQAcGNvSlEHvmFerg7M4ybucRnY6IsldUUoiF+X9gc/PhXBadOTvfbXms74SNAqGObnqitE2Lcs3KbcPoBweDdMjLdjKGSVs+jDe4XsKFKtaSJmxyh7dntqHLM+qh2IhrjSto5xVmtTTEPgONeWdoDqO1hOeGExUMfMTjDDhKT58RO20bailsRzv08GnQcNFpTg47n3mstzZqJJRegcw+nD/uRILfO61+nxWddXD8GrxjWfgNRjsNJYINee7vN6Lmo6t2GQyO8XsdfsdfsdfskMoQ== vladsontv95@gmail.com" 
+  read_only     = false
 }
 
-# Add Discord notification workflow
-resource "github_repository_file" "discord_workflow" {
-  repository = github_repository.my_repo.name
-  file       = ".github/workflows/discord-notifications.yml"
-  content    = <<EOF
-name: PR Notifications to Discord
-
-on:
-  pull_request:
-    types: [opened, synchronize, closed]
-
-jobs:
-  notify_discord:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Send PR notifications to Discord
-        uses: peter-evans/discord-webhook-action@v1
-        with:
-          webhook-url: "https://discord.com/api/webhooks/1316764779423076434/OJZbjcaiXNrs_UGWjzoaqyT2MB3vjDREQshnvCGleih22sNSfQbPTJbpv3cgPQlTDH6o"
-EOF
-
-  commit_message = "Added Discord notification workflow"
+resource "github_repository_file" "codeowners" {
+  repository = github_repository.repo.name
+  file       = ".github/CODEOWNERS"
+  content    = "* @softservedata"
 }
 
-# Add PAT to repository secrets
-resource "github_actions_secret" "pat_secret" {
-  repository    = github_repository.my_repo.name
-  secret_name   = "PAT"
-  plaintext_value = var.pat
+resource "github_actions_secret" "pat" {
+  repository = github_repository.repo.name
+  secret_name = "PAT"
+  plaintext_value = "<YOUR_GITHUB_PAT>"
 }
 
-resource "github_actions_secret" "discord_webhook" {
-  repository    = github_repository.my_repo.name
-  secret_name   = "DISCORD_WEBHOOK"
-  plaintext_value = var.discord_webhook_url
+output "repository_url" {
+  value = github_repository.repo.html_url
 }
-
-# Variables
-#variable "github_token" {}
-#variable "github_owner" {}
-#variable "deploy_key" {}
-#variable "pat" {}
-#variable "discord_webhook_url" {}
-
